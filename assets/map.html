@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Leaflet Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
+    #map { height: 100%; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    let map;
+    let hasZoomedToCurrentLocation = false; // Biến kiểm soát zoom lần đầu
+
+    try {
+      map = L.map('map').setView([21.0285, 105.8542], 10);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+    } catch (e) {
+      console.error('Error initializing map:', e);
+    }
+
+    function updateMap(data) {
+      try {
+        if (map) {
+          map.eachLayer((layer) => {
+            if (!layer.options || !layer.options.attribution) {
+              map.removeLayer(layer);
+            }
+          });
+
+          if (data.currentLocation) {
+            L.marker([data.currentLocation.lat, data.currentLocation.lng]).addTo(map)
+              .bindPopup('Vị trí hiện tại').openPopup();
+            // Chỉ zoom lần đầu tiên
+            if (!hasZoomedToCurrentLocation) {
+              map.setView([data.currentLocation.lat, data.currentLocation.lng], 14);
+              hasZoomedToCurrentLocation = true;
+            }
+          }
+
+          if (data.locations) {
+            data.locations.forEach(location => {
+              if (!data.searchQuery || location.products.some(product =>
+                  product.toLowerCase().includes(data.searchQuery.toLowerCase()))) {
+                L.marker([location.lat, location.lng]).addTo(map)
+                  .bindPopup(`<b>${location.name}</b><br>Cung cấp: ${location.products.join(', ')}`);
+              }
+            });
+          }
+
+          if (data.geojson) {
+            const filteredGeojson = {
+              ...data.geojson,
+              features: data.geojson.features.filter(feature =>
+                !data.searchQuery || feature.properties.products.some(product =>
+                  product.toLowerCase().includes(data.searchQuery.toLowerCase())
+                )
+              )
+            };
+            const geojsonLayer = L.geoJSON(filteredGeojson, {
+              style: function (feature) {
+                return {
+                  color: 'blue',
+                  fillColor: 'blue',
+                  fillOpacity: 0.2,
+                  weight: 2
+                };
+              },
+              onEachFeature: function (feature, layer) {
+                if (feature.properties && feature.properties.name) {
+                  layer.bindPopup(`<b>${feature.properties.name}</b><br>Cung cấp: ${feature.properties.products.join(', ')}`);
+                }
+              }
+            }).addTo(map);
+
+            // Zoom để hiển thị tất cả vùng nếu có tìm kiếm
+            if (filteredGeojson.features.length > 0 && data.searchQuery) {
+              map.fitBounds(geojsonLayer.getBounds());
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error updating map:', e);
+      }
+    }
+
+    window.addEventListener("flutterInAppWebViewPlatformReady", function(event) {
+      window.flutter_inappwebview.callHandler('updateMap', { data: {} });
+    });
+  </script>
+</body>
+</html>

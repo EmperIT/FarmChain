@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'dart:math';
-// import 'package:google_maps_webservice/places.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import '../components/search.dart';
+import 'dart:convert';
+
 class MapView extends StatefulWidget {
   const MapView({super.key});
 
@@ -12,81 +11,118 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
-  
-  
-  GoogleMapController? _mapController;
-  LatLng _initialPosition = const LatLng(21.0285, 105.8542);
-  final Set<Marker> _markers = {};
-  final Set<Polygon> _polygons = {};
+  late WebViewController _webViewController;
+  Map<String, double>? _currentPosition;
   final TextEditingController _searchController = TextEditingController();
+  Map<String, dynamic>? _geojsonData;
 
-  // Dữ liệu giả lập: danh sách các địa điểm và sản phẩm chúng cung cấp
+  // Dữ liệu địa điểm (marker)
   final List<Map<String, dynamic>> _locations = [
     {
       'name': 'Cửa hàng rau sạch Ba Đình',
       'products': ['Cà chua', 'Dâu tây'],
-      'position': const LatLng(21.0285, 105.8542),
+      'position': {'lat': 21.0285, 'lng': 105.8542},
     },
     {
       'name': 'Vườn rau Hữu Cơ Tây Hồ',
       'products': ['Cà chua', 'Rau xà lách'],
-      'position': const LatLng(21.0400, 105.8550),
+      'position': {'lat': 21.0400, 'lng': 105.8550},
     },
     {
       'name': 'Nông trại Đà Lạt 1',
       'products': ['Dâu tây', 'Cam'],
-      'position': const LatLng(11.9404, 108.4583),
+      'position': {'lat': 11.9404, 'lng': 108.4583},
     },
     {
       'name': 'Nông trại Đà Lạt 2',
       'products': ['Cam', 'Rau cải'],
-      'position': const LatLng(11.9450, 108.4600),
+      'position': {'lat': 11.9450, 'lng': 108.4600},
     },
   ];
 
   @override
   void initState() {
     super.initState();
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFF000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (int progress) {
+            print('WebView loading progress: $progress%');
+          },
+          onPageStarted: (String url) {
+            print('WebView started loading: $url');
+          },
+          onPageFinished: (String url) {
+            print('WebView finished loading: $url');
+            if (_geojsonData != null) {
+              _updateMap();
+            }
+          },
+          onWebResourceError: (WebResourceError error) {
+            print('WebView error: ${error.description}');
+          },
+        ),
+      )
+      ..loadFlutterAsset('assets/map.html');
+    _loadGeojson();
     _getCurrentLocation();
+  }
+
+  Future<void> _loadGeojson() async {
+    try {
+      String jsonString = await DefaultAssetBundle.of(context).loadString('assets/regions.json');
+      setState(() {
+        _geojsonData = jsonDecode(jsonString);
+        print('GeoJSON loaded: $_geojsonData');
+        _updateMap(); // Gọi _updateMap sau khi tải GeoJSON
+      });
+    } catch (e) {
+      print('Error loading GeoJSON: $e');
+    }
   }
 
   Future<void> _getCurrentLocation() async {
     try {
       bool isLocationEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!isLocationEnabled) return;
+      if (!isLocationEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng bật dịch vụ định vị')),
+        );
+        return;
+      }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Quyền định vị bị từ chối')),
+          );
+          return;
+        }
       }
-      if (permission == LocationPermission.deniedForever) return;
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Quyền định vị bị từ chối vĩnh viễn')),
+        );
+        return;
+      }
 
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
       setState(() {
-        _initialPosition = LatLng(position.latitude, position.longitude);
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('current_location'),
-            position: _initialPosition,
-            infoWindow: const InfoWindow(
-              title: 'Vị trí hiện tại',
-              snippet: 'Bạn đang ở đây',
-            ),
-          ),
-        );
+        _currentPosition = {
+          'lat': position.latitude,
+          'lng': position.longitude,
+        };
+        if (_geojsonData != null) {
+          _updateMap();
+        }
       });
-
-      if (_mapController != null) {
-        _mapController!.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(target: _initialPosition, zoom: 14.0),
-          ),
-        );
-      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi: $e')),
@@ -94,92 +130,33 @@ class _MapViewState extends State<MapView> {
     }
   }
 
-  void _onSearchSubmitted(String query) {
-    if (query.isEmpty) {
-      setState(() {
-        _markers.clear();
-        _polygons.clear();
-      });
+  void _updateMap() {
+    if (_geojsonData == null) {
+      print('GeoJSON not loaded yet');
       return;
     }
 
-    // Tìm các địa điểm cung cấp sản phẩm khớp với từ khóa
-    final filteredLocations = _locations.where((location) {
-      final products = location['products'] as List<dynamic>;
-      return products.any((product) => product.toString().toLowerCase().contains(query.toLowerCase()));
-    }).toList();
-
-    if (filteredLocations.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không tìm thấy địa điểm cung cấp sản phẩm')),
-      );
-      setState(() {
-        _markers.clear();
-        _polygons.clear();
-      });
-      return;
-    }
-
-    // Xóa marker và polygon cũ, thêm marker mới
-    setState(() {
-      _markers.clear();
-      _polygons.clear();
-      for (var location in filteredLocations) {
-        _markers.add(
-          Marker(
-            markerId: MarkerId(location['name']),
-            position: location['position'],
-            infoWindow: InfoWindow(
-              title: location['name'],
-              snippet: 'Cung cấp: ${location['products'].join(', ')}',
-            ),
-            onTap: () {
-              _mapController?.showMarkerInfoWindow(MarkerId(location['name']));
-            },
-          ),
-        );
-      }
-
-      // Tạo Polygon để khoanh vùng
-      if (filteredLocations.length > 1) {
-        final List<LatLng> polygonPoints = filteredLocations
-            .map((location) => location['position'] as LatLng)
-            .toList();
-        _polygons.add(
-          Polygon(
-            polygonId: const PolygonId('search_area'),
-            points: polygonPoints,
-            fillColor: Colors.blue.withOpacity(0.2),
-            strokeColor: Colors.blue,
-            strokeWidth: 2,
-          ),
-        );
-      }
-    });
-
-    // Di chuyển camera đến vùng bao quanh các marker
-    if (_mapController != null && filteredLocations.isNotEmpty) {
-      final bounds = _calculateBounds(filteredLocations);
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 50), // Padding 50
-      );
-    }
+    final mapData = {
+      'currentLocation': _currentPosition,
+      'locations': _locations.map((loc) => {
+            'name': loc['name'],
+            'products': loc['products'],
+            'lat': loc['position']['lat'],
+            'lng': loc['position']['lng'],
+          }).toList(),
+      'geojson': _geojsonData,
+      'searchQuery': _searchController.text,
+    };
+    _webViewController.runJavaScript(
+      'updateMap(${jsonEncode(mapData)});',
+    );
   }
 
-  // Hàm tính LatLngBounds để bao quanh các địa điểm
-  LatLngBounds _calculateBounds(List<Map<String, dynamic>> locations) {
-    double? minLat, maxLat, minLng, maxLng;
-    for (var location in locations) {
-      final pos = location['position'] as LatLng;
-      minLat = minLat == null ? pos.latitude : min(minLat, pos.latitude);
-      maxLat = maxLat == null ? pos.latitude : max(maxLat, pos.latitude);
-      minLng = minLng == null ? pos.longitude : min(minLng, pos.longitude);
-      maxLng = maxLng == null ? pos.longitude : max(maxLng, pos.longitude);
-    }
-    return LatLngBounds(
-      southwest: LatLng(minLat!, minLng!),
-      northeast: LatLng(maxLat!, maxLng!),
-    );
+  void _onSearchSubmitted(String query) {
+    setState(() {
+      _searchController.text = query;
+      _updateMap();
+    });
   }
 
   @override
@@ -192,23 +169,45 @@ class _MapViewState extends State<MapView> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        GoogleMap(
-          onMapCreated: (controller) => _mapController = controller,
-          initialCameraPosition: CameraPosition(
-            target: _initialPosition,
-            zoom: 14.0,
-          ),
-          markers: _markers,
-          myLocationEnabled: true,
-          myLocationButtonEnabled: false,
-        ),
+        WebViewWidget(controller: _webViewController),
         Positioned(
           top: 40,
           left: 0,
           right: 0,
-          child: CustomSearchBar(
-            controller: _searchController,
-            onSubmitted: (query) => _onSearchSubmitted(query),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.3),
+                    spreadRadius: 2,
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Tìm sản phẩm (Cà chua, Dâu tây...)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: () => _onSearchSubmitted(_searchController.text),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                ),
+                onSubmitted: _onSearchSubmitted,
+              ),
+            ),
           ),
         ),
       ],
