@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'components/bottom_navbar.dart';
+import 'components/bottom_navbar.dart'; // Đảm bảo tên file đúng
 import 'views/home_view.dart';
-import 'views/chat_view.dart';
+// import 'views/chat_view.dart';
 import 'views/map_view.dart';
 import 'views/order_view.dart';
+import 'views/role_selection_view.dart'; // Nhập file mới
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,6 @@ class FarmChain extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      
       title: 'FarmChain',
       theme: ThemeData(
         primarySwatch: Colors.green,
@@ -36,11 +36,11 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 2; // Mặc định là Map (chỉ mục 2)
-  
+
   // Danh sách các màn hình
   static final List<Widget> _widgetOptions = <Widget>[
     const HomeView(),
-    const ChatView(),
+    const RoleSelectionView(), // Sử dụng file riêng
     MapView(),
     const OrderView(),
   ];

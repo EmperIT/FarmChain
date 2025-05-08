@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class ChatView extends StatefulWidget {
-  const ChatView({super.key});
+  final String role; // Thêm tham số role
+  const ChatView({super.key, required this.role});
 
   @override
   _ChatViewState createState() => _ChatViewState();
@@ -53,11 +54,33 @@ class _ChatViewState extends State<ChatView> {
         _messages.add({
           'text': _messageController.text,
           'time': '${DateTime.now().hour}:${DateTime.now().minute} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
-          'isSender': true,
+          'isSender': widget.role == 'buyer' ? false : true, // Người mua gửi tin nhắn là false, người bán là true
           'avatar': null,
         });
         _messageController.clear();
       });
+    }
+  }
+
+  void _handleAction() {
+    if (widget.role == 'buyer') {
+      // Hành vi cho người mua: Đặt hàng
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Đã đặt hàng với giá ${_products[0]['price']} và số lượng từ người bán',
+          ),
+        ),
+      );
+    } else {
+      // Hành vi cho người bán: Áp dụng giá và số lượng (hiện tại là rỗng, có thể mở rộng)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Đã áp dụng giá ${_bidPriceController.text} đ và số lượng ${_quantityController.text} kg',
+          ),
+        ),
+      );
     }
   }
 
@@ -75,10 +98,10 @@ class _ChatViewState extends State<ChatView> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Center(
+        title: Center(
           child: Text(
-            'Live Chat',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+            'Live Chat - ${widget.role == 'buyer' ? 'Người mua' : 'Người bán'}',
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
           ),
         ),
         leading: IconButton(
@@ -88,7 +111,7 @@ class _ChatViewState extends State<ChatView> {
       ),
       body: Column(
         children: [
-          // Phần sản phẩm (đã sửa lại layout để tránh overflow)
+          // Phần sản phẩm
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             padding: const EdgeInsets.all(10),
@@ -167,78 +190,127 @@ class _ChatViewState extends State<ChatView> {
                             ],
                           ),
                           const SizedBox(height: 10),
-                          // Giá thầu và số lượng (chuyển sang ngang)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Giá thay đổi: ',
-                                    style: TextStyle(fontSize: 14, color: Colors.black),
-                                  ),
-                                  SizedBox(
-                                    width: 80,
-                                    height: 30, // Giảm chiều rộng ô nhập
-                                    child: TextField(
-                                      controller: _bidPriceController,
-                                      decoration: InputDecoration(
-                                        hintText: '50.000',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(10), // Bo tròn nhỏ hơn
-                                        ),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Giảm padding
+                          // Giá thay đổi và số lượng, chỉ hiển thị cho người bán
+                          if (widget.role == 'seller') ...[
+                            Row(
+                              children: [
+                                const Text(
+                                  'Giá thay đổi: ',
+                                  style: TextStyle(fontSize: 14, color: Colors.black),
+                                ),
+                                SizedBox(
+                                  width: 80,
+                                  height: 30,
+                                  child: TextField(
+                                    controller: _bidPriceController,
+                                    decoration: InputDecoration(
+                                      hintText: '50.000',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                      keyboardType: TextInputType.number,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     ),
+                                    keyboardType: TextInputType.number,
                                   ),
-                                  const SizedBox(width: 5),
-                                  const Text('đ', style: TextStyle(fontSize: 14)),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Sl:  ',
-                                    style: TextStyle(fontSize: 14, color: Colors.black),
-                                  ),
-                                  SizedBox(
-                                    width: 50,
-                                    height: 30, // Giảm chiều rộng ô nhập
-                                    child: TextField(
-                                      controller: _quantityController,
-                                      decoration: InputDecoration(
-                                        hintText: '10',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(10), // Bo tròn nhỏ hơn
+                                ),
+                                const SizedBox(width: 5),
+                                const Text('đ', style: TextStyle(fontSize: 14)),
+                              ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Sl: ',
+                                      style: TextStyle(fontSize: 14, color: Colors.black),
+                                    ),
+                                    SizedBox(
+                                      width: 50,
+                                      height: 30,
+                                      child: TextField(
+                                        controller: _quantityController,
+                                        decoration: InputDecoration(
+                                          hintText: '10',
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         ),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Giảm padding
+                                        keyboardType: TextInputType.number,
                                       ),
-                                      keyboardType: TextInputType.number,
                                     ),
+                                    const SizedBox(width: 5),
+                                    const Text('kg', style: TextStyle(fontSize: 14)),
+                                  ],
+                                ),
+                                ElevatedButton(
+                                  onPressed: _handleAction,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                                   ),
-                                  const SizedBox(width: 5),
-                                  const Text('kg', style: TextStyle(fontSize: 14)),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 5),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton(
-                              onPressed: () {},
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                              ),
-                              child: const Text(
-                                'Áp dụng',
-                                style: TextStyle(color: Colors.white, fontSize: 14),
+                                  child: const Text(
+                                    'Áp dụng',
+                                    style: TextStyle(color: Colors.white, fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else ...[
+                            // Hiển thị thông tin giá và số lượng từ người bán cho người mua
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Giá thay đổi: ',
+                                  style: TextStyle(fontSize: 14, color: Colors.black),
+                                ),
+                                Text(
+                                  '${_products[0]['price']}',
+                                  style: TextStyle(
+                                    color: Colors.green[700],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Số lượng',
+                                  style: TextStyle(fontSize: 14, color: Colors.black),
+                                ),
+                                const Text(
+                                  'Đang cập nhật',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton(
+                                onPressed: _handleAction,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                ),
+                                child: const Text(
+                                  'Đặt hàng',
+                                  style: TextStyle(color: Colors.white, fontSize: 14),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),

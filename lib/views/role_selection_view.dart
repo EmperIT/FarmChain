@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'chat_view.dart'; // Nhập file ChatView
+import '../views/chat_view.dart'; // Nhập ChatView để điều hướng
 
-class HomeView extends StatelessWidget {
-  const HomeView({super.key});
+class RoleSelectionView extends StatelessWidget {
+  const RoleSelectionView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +23,7 @@ class HomeView extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushReplacement(
+                Navigator.push( // Thay pushReplacement thành push
                   context,
                   MaterialPageRoute(
                     builder: (context) => const ChatView(role: 'buyer'),
@@ -42,7 +42,7 @@ class HomeView extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushReplacement(
+                Navigator.push( // Thay pushReplacement thành push
                   context,
                   MaterialPageRoute(
                     builder: (context) => const ChatView(role: 'seller'),
