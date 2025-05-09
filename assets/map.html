@@ -8,6 +8,18 @@
   <style>
     html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
     #map { height: 100%; width: 100%; }
+    .view-detail-btn { 
+      margin-top: 10px; 
+      padding: 5px 10px; 
+      background-color: #4CAF50; 
+      color: white; 
+      border: none; 
+      border-radius: 5px; 
+      cursor: pointer; 
+    }
+    .view-detail-btn:hover { 
+      background-color: #45a049; 
+    }
   </style>
 </head>
 <body>
@@ -15,11 +27,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     let map;
-    let hasZoomedToCurrentLocation = false; // Biến kiểm soát zoom lần đầu
+    let hasZoomedToCurrentLocation = false;
 
     try {
       map = L.map('map').setView([21.0285, 105.8542], 10);
-
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -40,7 +51,6 @@
           if (data.currentLocation) {
             L.marker([data.currentLocation.lat, data.currentLocation.lng]).addTo(map)
               .bindPopup('Vị trí hiện tại').openPopup();
-            // Chỉ zoom lần đầu tiên
             if (!hasZoomedToCurrentLocation) {
               map.setView([data.currentLocation.lat, data.currentLocation.lng], 14);
               hasZoomedToCurrentLocation = true;
@@ -51,8 +61,13 @@
             data.locations.forEach(location => {
               if (!data.searchQuery || location.products.some(product =>
                   product.toLowerCase().includes(data.searchQuery.toLowerCase()))) {
+                const popupContent = `
+                  <b>${location.name}</b><br>
+                  Cung cấp: ${location.products.join(', ')}<br>
+                  <button class="view-detail-btn" onclick="viewDetail('${location.name}')">View Detail</button>
+                `;
                 L.marker([location.lat, location.lng]).addTo(map)
-                  .bindPopup(`<b>${location.name}</b><br>Cung cấp: ${location.products.join(', ')}`);
+                  .bindPopup(popupContent);
               }
             });
           }
@@ -77,12 +92,16 @@
               },
               onEachFeature: function (feature, layer) {
                 if (feature.properties && feature.properties.name) {
-                  layer.bindPopup(`<b>${feature.properties.name}</b><br>Cung cấp: ${feature.properties.products.join(', ')}`);
+                  const popupContent = `
+                    <b>${feature.properties.name}</b><br>
+                    Cung cấp: ${feature.properties.products.join(', ')}<br>
+                    <button class="view-detail-btn" onclick="viewDetail('${feature.properties.name}')">View Detail</button>
+                  `;
+                  layer.bindPopup(popupContent);
                 }
               }
             }).addTo(map);
 
-            // Zoom để hiển thị tất cả vùng nếu có tìm kiếm
             if (filteredGeojson.features.length > 0 && data.searchQuery) {
               map.fitBounds(geojsonLayer.getBounds());
             }
@@ -93,9 +112,27 @@
       }
     }
 
-    window.addEventListener("flutterInAppWebViewPlatformReady", function(event) {
-      window.flutter_inappwebview.callHandler('updateMap', { data: {} });
-    });
+    function viewDetail(locationName) {
+      try {
+        // Use the ViewDetailChannel to send the location name to Flutter
+        if (window.ViewDetailChannel && typeof window.ViewDetailChannel.postMessage === 'function') {
+          window.ViewDetailChannel.postMessage(locationName);
+          console.log('Message sent to ViewDetailChannel:', locationName);
+        } else {
+          console.error('ViewDetailChannel is not available, retrying...');
+          setTimeout(() => {
+            if (window.ViewDetailChannel && typeof window.ViewDetailChannel.postMessage === 'function') {
+              window.ViewDetailChannel.postMessage(locationName);
+              console.log('Retry successful, message sent:', locationName);
+            } else {
+              console.error('Retry failed: ViewDetailChannel still not available');
+            }
+          }, 500);
+        }
+      } catch (e) {
+        console.error('Error sending message to ViewDetailChannel:', e);
+      }
+    }
   </script>
 </body>
 </html>

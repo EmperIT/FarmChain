@@ -1,62 +1,89 @@
 {
-    "type": "FeatureCollection",
-    "features": [
-      {
-        "type": "Feature",
-        "properties": {
-          "name": "Vùng rau sạch Ba Đình",
-          "products": ["Cà chua", "Dâu tây"]
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [105.8500, 21.0250],
-              [105.8600, 21.0250],
-              [105.8600, 21.0350],
-              [105.8500, 21.0350],
-              [105.8500, 21.0250]
-            ]
-          ]
-        }
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Vùng trồng Cà chua Nam Định",
+        "products": ["Cà chua", "Rau muống"],
+        "image": "https://cdn.pixabay.com/photo/2016/08/01/17/08/tomatoes-1561565_960_720.jpg",
+        "description": "Vùng trồng cà chua lớn nhất Nam Định, sản phẩm đảm bảo an toàn và chất lượng cao."
       },
-      {
-        "type": "Feature",
-        "properties": {
-          "name": "Vùng rau hữu cơ Tây Hồ",
-          "products": ["Cà chua", "Rau xà lách"]
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [105.8500, 21.0350],
-              [105.8650, 21.0350],
-              [105.8650, 21.0450],
-              [105.8500, 21.0450],
-              [105.8500, 21.0350]
-            ]
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [106.1628, 20.4040],
+            [106.1828, 20.4040],
+            [106.1828, 20.4240],
+            [106.1628, 20.4240],
+            [106.1628, 20.4040]
           ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "name": "Vùng nông trại Đà Lạt",
-          "products": ["Dâu tây", "Cam"]
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [108.4500, 11.9350],
-              [108.4650, 11.9350],
-              [108.4650, 11.9450],
-              [108.4500, 11.9450],
-              [108.4500, 11.9350]
-            ]
-          ]
-        }
+        ]
       }
-    ]
-  }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Vùng trồng Dâu tây Mộc Châu",
+        "products": ["Dâu tây", "Xà lách"],
+        "image": "https://cdn.pixabay.com/photo/2010/12/13/10/05/berries-2277_960_720.jpg",
+        "description": "Dâu tây Mộc Châu nổi tiếng với hương vị ngọt và thơm đặc trưng của vùng cao nguyên."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [104.6311, 20.8340],
+            [104.6511, 20.8340],
+            [104.6511, 20.8540],
+            [104.6311, 20.8540],
+            [104.6311, 20.8340]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Vùng trồng Cam Hòa Bình",
+        "products": ["Cam", "Quýt"],
+        "image": "https://cdn.pixabay.com/photo/2016/01/02/02/03/orange-1117645_960_720.jpg",
+        "description": "Vùng trồng cam lớn nhất Hòa Bình, nổi tiếng với vị ngọt đậm, không hạt và nhiều nước."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [105.3390, 20.7950],
+            [105.3590, 20.7950],
+            [105.3590, 20.8150],
+            [105.3390, 20.8150],
+            [105.3390, 20.7950]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Vùng trồng Rau cải Bắc Ninh",
+        "products": ["Rau cải", "Bắp cải"],
+        "image": "https://cdn.pixabay.com/photo/2018/06/17/14/45/cabbage-3480653_960_720.jpg",
+        "description": "Vùng chuyên canh rau cải tại Bắc Ninh, sản phẩm sạch không thuốc trừ sâu."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [106.0550, 21.1180],
+            [106.0750, 21.1180],
+            [106.0750, 21.1380],
+            [106.0550, 21.1380],
+            [106.0550, 21.1180]
+          ]
+        ]
+      }
+    }
+  ]
+}

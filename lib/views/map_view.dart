@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:convert';
+import 'location_detail_page.dart'; // Import your LocationDetailPage
 
 class MapView extends StatefulWidget {
   const MapView({super.key});
@@ -16,27 +17,39 @@ class _MapViewState extends State<MapView> {
   final TextEditingController _searchController = TextEditingController();
   Map<String, dynamic>? _geojsonData;
 
-  // Dữ liệu địa điểm (marker)
+  // Dữ liệu địa điểm (marker) with additional fields for details
   final List<Map<String, dynamic>> _locations = [
     {
       'name': 'Cửa hàng rau sạch Ba Đình',
       'products': ['Cà chua', 'Dâu tây'],
       'position': {'lat': 21.0285, 'lng': 105.8542},
+      'description': 'Cửa hàng cung cấp rau sạch chất lượng cao tại Ba Đình.',
+      'image': 'assets/images/ba_dinh_store.jpg', // Local image path
+      'rating': 4.5,
     },
     {
       'name': 'Vườn rau Hữu Cơ Tây Hồ',
       'products': ['Cà chua', 'Rau xà lách'],
       'position': {'lat': 21.0400, 'lng': 105.8550},
+      'description': 'Vườn rau hữu cơ với sản phẩm tươi ngon tại Tây Hồ.',
+      'image': 'assets/images/tay_ho_farm.jpg',
+      'rating': 4.8,
     },
     {
       'name': 'Nông trại Đà Lạt 1',
       'products': ['Dâu tây', 'Cam'],
       'position': {'lat': 11.9404, 'lng': 108.4583},
+      'description': 'Nông trại cung cấp dâu tây và cam tươi từ Đà Lạt.',
+      'image': 'assets/images/dalat_farm1.jpg',
+      'rating': 4.2,
     },
     {
       'name': 'Nông trại Đà Lạt 2',
       'products': ['Cam', 'Rau cải'],
       'position': {'lat': 11.9450, 'lng': 108.4600},
+      'description': 'Nông trại chuyên cung cấp cam và rau cải tại Đà Lạt.',
+      'image': 'assets/images/dalat_farm2.jpg',
+      'rating': 4.0,
     },
   ];
 
@@ -65,6 +78,30 @@ class _MapViewState extends State<MapView> {
           },
         ),
       )
+      ..addJavaScriptChannel(
+        'ViewDetailChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          // Handle the location name received from JavaScript
+          final locationName = message.message;
+          final location = _locations.firstWhere(
+            (loc) => loc['name'] == locationName,
+            orElse: () => {},
+          );
+          if (location.isNotEmpty) {
+            // Navigate to LocationDetailPage
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LocationDetailPage(location: location),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Không tìm thấy thông tin địa điểm')),
+            );
+          }
+        },
+      )
       ..loadFlutterAsset('assets/map.html');
     _loadGeojson();
     _getCurrentLocation();
@@ -76,7 +113,7 @@ class _MapViewState extends State<MapView> {
       setState(() {
         _geojsonData = jsonDecode(jsonString);
         print('GeoJSON loaded: $_geojsonData');
-        _updateMap(); // Gọi _updateMap sau khi tải GeoJSON
+        _updateMap();
       });
     } catch (e) {
       print('Error loading GeoJSON: $e');

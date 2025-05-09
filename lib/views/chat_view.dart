@@ -46,29 +46,13 @@ class ChatView extends StatefulWidget {
 
 class _ChatViewState extends State<ChatView> {
   final TextEditingController _messageController = TextEditingController();
-  final TextEditingController _bidPriceController = TextEditingController();
-  final TextEditingController _quantityController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
   WebSocketChannel? _channel;
   bool _isConnected = false;
   bool _roleInitialized = false;
+  String _currentPrice = '60.000';
   
-  final List<ChatMessage> _messages = [
-    // Initialize with example messages for better user experience
-    ChatMessage(
-      type: 'chat',
-      senderRole: 'seller',
-      content: 'Chào Anh/Chị, Đã Lấy Thu Hoạch 1 Tạ Tuyến Trái Đẹp, Ngọt. Khối lượng Đã Gửi Thẩm Khảo: 18.000Kg. Anh/Chị Cần Số Lượng Bao Nhiêu Để Em Báo Giá Tốt Hơn Nhạ',
-      time: '10:00 AM',
-      isMine: false,
-    ),
-    ChatMessage(
-      type: 'chat',
-      senderRole: 'buyer',
-      content: 'Đã Nhận Được Đơn. Đủ 3 Tấn Thị Giá Tốt Nhất Em Đánh Giá Nhé?',
-      time: '10:01 AM',
-      isMine: false,
-    ),
-  ];
+  final List<ChatMessage> _messages = [];
   
   final Map<String, dynamic> _product = {
     'name': 'Vải thánh Hà',
@@ -81,12 +65,13 @@ class _ChatViewState extends State<ChatView> {
   void initState() {
     super.initState();
     _connectWebSocket();
+    _currentPrice = _product['price'];
   }
 
   void _connectWebSocket() {
     try {
       // Update the WebSocket connection URL based on your deployment environment
-      final wsUrl = 'ws://fa3a-113-185-94-241.ngrok-free.app/ws/chat';
+      final wsUrl = 'ws://70ad-2402-9d80-348-260f-546c-fde6-7478-5c9e.ngrok-free.app/ws/chat';
       
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       
@@ -143,8 +128,6 @@ class _ChatViewState extends State<ChatView> {
       setState(() {
         _roleInitialized = true;
       });
-      
-      _showSuccessMessage('Đã kết nối thành công với vai trò: ${widget.role == 'buyer' ? 'Người mua' : 'Người bán'}');
     } else {
       print('❌ Cannot send role message: not connected');
       Future.delayed(const Duration(seconds: 2), _connectWebSocket);
@@ -170,62 +153,94 @@ class _ChatViewState extends State<ChatView> {
   }
   
   void _sendMessageContent() {
-    // Check if the message is a number/price
     final String content = _messageController.text;
-    bool isNumeric = double.tryParse(content.replaceAll(',', '.')) != null;
     
-    final message = {
-      'type': 'message',
-      'role': widget.role,
-      'content': content,
-    };
-    _channel?.sink.add(jsonEncode(message));
-    print('📤 Sent message: $content');
-    
-    // Add message to local list for immediate display
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          type: 'chat',
-          senderRole: widget.role,
-          content: isNumeric ? '$content đ/kg' : content,
-          time: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
-          isMine: true,
-        ),
-      );
-    });
+      // Regular chat message
+      final message = {
+        'type': 'message',
+        'role': widget.role,
+        'content': content,
+      };
+      _channel?.sink.add(jsonEncode(message));
+      print('Sent message: $content');
+      
+      // Add message to local list for immediate display
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            type: 'chat',
+            senderRole: widget.role,
+            content: content,
+            time: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
+            isMine: true,
+          ),
+        );
+      });
     
     _messageController.clear();
   }
-
+  
   void _sendPriceMessage() {
-    if (_bidPriceController.text.isNotEmpty) {
+    final String priceText = _priceController.text.trim();
+    if (priceText.isNotEmpty) {
       if (_isConnected && _channel != null) {
         if (!_roleInitialized) {
           _sendRoleMessage();
           Future.delayed(const Duration(milliseconds: 500), () {
-            _sendPriceContent();
+            _sendPriceContent(priceText);
           });
         } else {
-          _sendPriceContent();
+          _sendPriceContent(priceText);
         }
       } else {
         _showErrorMessage('Mất kết nối, đang thử kết nối lại...');
         _connectWebSocket();
       }
-    } else {
-      _showErrorMessage('Vui lòng nhập giá');
     }
   }
-  
-  void _sendPriceContent() {
+
+  void _sendPriceContent(String price) {
     final message = {
-      'type': 'message',
+      'type': 'price_update',
       'role': widget.role,
-      'content': _bidPriceController.text,
+      'content': price,  // Fixed: Ensure we're sending the price as content
+      'price': price,    // Include price field for backward compatibility
+      'senderRole': widget.role  // Fixed: Include senderRole field
     };
     _channel?.sink.add(jsonEncode(message));
-    print('📤 Sent price: ${_bidPriceController.text}');
+    print('📤 Sent price update: $price');
+    
+    // Fixed: Update the current price in the UI
+    setState(() {
+      _currentPrice = price;
+    });
+    
+    // Clear the price input field after sending
+    _priceController.clear();
+    
+    // Add a message to indicate price change (optional)
+    setState(() {
+      _messages.add(
+        ChatMessage(
+          type: 'chat',
+          senderRole: widget.role,
+          content: 'Đã cập nhật giá: $price đ/kg',
+          time: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
+          isMine: true,
+        ),
+      );
+    });
+  }
+
+  void _sendPriceFromChat(String priceStr) {
+    final message = {
+      'type': 'price',
+      'role': widget.role,
+      'content': priceStr,
+      'senderRole': widget.role
+    };
+    _channel?.sink.add(jsonEncode(message));
+    print('📤 Sent price from chat: $priceStr');
     
     // Add message to local list for immediate display
     setState(() {
@@ -233,49 +248,133 @@ class _ChatViewState extends State<ChatView> {
         ChatMessage(
           type: 'chat',
           senderRole: widget.role,
-          content: '${_bidPriceController.text} đ/kg',
+          content: '$priceStr đ/kg',
           time: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
           isMine: true,
         ),
       );
     });
     
-    _showSuccessMessage('Đã gửi giá thành công');
+    // Update current price if seller
+    if (widget.role == 'seller') {
+      setState(() {
+        _currentPrice = priceStr;
+      });
+    }
+  }
+
+  
+  void _handlePurchase() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Xác nhận mua hàng'),
+          content: Text('Bạn muốn mua sản phẩm ${_product["name"]} với giá $_currentPrice đ/kg?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _confirmPurchase();
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Xác nhận'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  void _confirmPurchase() {
+    // Send purchase confirmation message
+    final message = {
+      'type': 'purchase',
+      'role': widget.role,
+      'content': _currentPrice,
+      'senderRole': widget.role
+    };
+    _channel?.sink.add(jsonEncode(message));
     
-    // Clear price field after sending
-    _bidPriceController.clear();
+    // Add confirmation message to chat
+    setState(() {
+      _messages.add(
+        ChatMessage(
+          type: 'chat',
+          senderRole: widget.role,
+          content: 'Đã mua hàng với giá $_currentPrice đ/kg',
+          time: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
+          isMine: true,
+        ),
+      );
+    });
+    
+    // Show success message
+    _showSuccessMessage('Đã mua hàng thành công với giá $_currentPrice đ/kg');
   }
 
   void _handleIncomingMessage(Map<String, dynamic> data) {
     print('📥 Received message: $data');
     
+    // Skip messages that were sent by the current user (already displayed locally)
+    if ((data['type'] == 'chat' || data['type'] == 'price' || data['type'] == 'purchase') && 
+        data['senderRole'] == widget.role) {
+      print('Skipping message from self (already displayed locally)');
+      return;
+    }
+    
     if (data['type'] == 'chat') {
-      // Check if the content is a number/price
-      final String content = data['content'] ?? '';
-      bool isNumeric = double.tryParse(content.replaceAll(',', '.')) != null;
-      
-      // If it's a number and not from current user, format as price
-      if (isNumeric && data['senderRole'] != widget.role) {
-        setState(() {
+      setState(() {
+        _messages.add(
+          ChatMessage.fromJson(data, widget.role),
+        );
+      });
+    } else if (data['type'] == 'price_update' || data['type'] == 'price_sell') {
+      // Fixed: Handle price update messages and update current price
+      setState(() {
+        if (data['content'] != null && data['content'].toString().isNotEmpty) {
+          _currentPrice = data['content'].toString();
+        } else if (data['price'] != null && data['price'].toString().isNotEmpty) {
+          _currentPrice = data['price'].toString();
+        }
+        
+        // Add informational message about price update
+        if(data['senderRole']!=widget.role){
           _messages.add(
-            ChatMessage(
-              type: 'chat',
-              senderRole: data['senderRole'] ?? '',
-              content: '$content đ/kg',
-              time: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
-              isMine: false,
-            ),
-          );
-        });
-      } else {
-        setState(() {
-          _messages.add(
-            ChatMessage.fromJson(data, widget.role),
-          );
-        });
-      }
+          ChatMessage(
+            type: 'chat',
+            senderRole: data['senderRole'] ?? '',
+            content: 'Đã cập nhật giá: $_currentPrice đ/kg',
+            time: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
+            isMine: false,
+          ),
+        );
+        } 
+      });
     } else if (data['type'] == 'ai_response') {
       _handleAIResponse(data);
+    } else if (data['type'] == 'purchase') {
+      // Handle purchase confirmation from other user
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            type: 'chat',
+            senderRole: data['senderRole'] ?? '',
+            content: 'Đã mua hàng với giá ${data['content']} đ/kg',
+            time: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} ${DateTime.now().hour >= 12 ? 'PM' : 'AM'}',
+            isMine: false,
+          ),
+        );
+      });
     } else if (data['error'] != null) {
       _showErrorMessage(data['error']);
     }
@@ -325,19 +424,10 @@ class _ChatViewState extends State<ChatView> {
     Future.delayed(const Duration(seconds: 3), _connectWebSocket);
   }
 
-  void _handleSubmitOffer() {
-    if (_bidPriceController.text.isNotEmpty) {
-      _sendPriceMessage();
-    } else {
-      _showErrorMessage('Vui lòng nhập giá');
-    }
-  }
-
   @override
   void dispose() {
     _messageController.dispose();
-    _bidPriceController.dispose();
-    _quantityController.dispose();
+    _priceController.dispose();
     _channel?.sink.close();
     super.dispose();
   }
@@ -466,7 +556,7 @@ class _ChatViewState extends State<ChatView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Name and original price
+                    // Name and current price
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -495,19 +585,20 @@ class _ChatViewState extends State<ChatView> {
                           ),
                         ),
                         Text(
-                          'Giá gốc: ${_product['price']} đ/kg',
+                          'Giá hiện tại: $_currentPrice đ/kg',
                           style: TextStyle(
                             color: Colors.green[700],
                             fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    // Price and quantity section based on role
+                    // Price and action section based on role
                     widget.role == 'seller' 
                         ? _buildSellerPriceControls()
-                        : _buildBuyerPriceView(),
+                        : _buildBuyerControls(),
                   ],
                 ),
               ),
@@ -519,21 +610,24 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Widget _buildSellerPriceControls() {
-    return Column(
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Giá thay đổi: ',
+              'Đặt giá mới: ',
               style: TextStyle(fontSize: 14, color: Colors.black),
             ),
             SizedBox(
               width: 80,
               height: 30,
               child: TextField(
-                controller: _bidPriceController,
+                controller: _priceController,
                 decoration: InputDecoration(
-                  hintText: '50.000',
+                  hintText: '50000',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -546,102 +640,50 @@ class _ChatViewState extends State<ChatView> {
             const Text('đ/kg', style: TextStyle(fontSize: 14)),
           ],
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  'Sl: ',
-                  style: TextStyle(fontSize: 14, color: Colors.black),
-                ),
-                SizedBox(
-                  width: 50,
-                  height: 30,
-                  child: TextField(
-                    controller: _quantityController,
-                    decoration: InputDecoration(
-                      hintText: '10',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                const Text('kg', style: TextStyle(fontSize: 14)),
-              ],
-            ),
-            ElevatedButton(
-              onPressed: _roleInitialized ? _handleSubmitOffer : () {
-                _sendRoleMessage();
-                Future.delayed(const Duration(milliseconds: 500), _handleSubmitOffer);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-              child: const Text(
-                'Gửi Giá',
-                style: TextStyle(color: Colors.white, fontSize: 14),
-              ),
-            ),
-          ],
+        const SizedBox(width: 8),
+        ElevatedButton(
+          onPressed: _roleInitialized ? _sendPriceMessage : () {
+            _sendRoleMessage();
+            Future.delayed(const Duration(milliseconds: 500), _sendPriceMessage);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            minimumSize: Size(100, 35),
+          ),
+          child: const Text(
+            'Cập nhật giá',
+            style: TextStyle(color: Colors.white, fontSize: 13),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildBuyerPriceView() {
-    return Column(
+  Widget _buildBuyerControls() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Row(
-          children: [
-            const Text(
-              'Đề nghị giá: ',
-              style: TextStyle(fontSize: 14, color: Colors.black),
-            ),
-            SizedBox(
-              width: 80,
-              height: 30,
-              child: TextField(
-                controller: _bidPriceController,
-                decoration: InputDecoration(
-                  hintText: '45.000',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            ),
-            const SizedBox(width: 5),
-            const Text('đ/kg', style: TextStyle(fontSize: 14)),
-            const Spacer(),
-            ElevatedButton(
-              onPressed: _roleInitialized ? _handleSubmitOffer : () {
-                _sendRoleMessage();
-                Future.delayed(const Duration(milliseconds: 500), _handleSubmitOffer);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
-              child: const Text(
-                'Gửi Giá',
-                style: TextStyle(color: Colors.white, fontSize: 14),
-              ),
-            ),
-          ],
+        ElevatedButton(
+          onPressed: _roleInitialized ? _handlePurchase : () {
+            _sendRoleMessage();
+            Future.delayed(const Duration(milliseconds: 500), _handlePurchase);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          ),
+          child: const Text(
+            'Mua hàng',
+            style: TextStyle(color: Colors.white, fontSize: 14),
+          ),
         ),
       ],
     );
   }
+
 
   Widget _buildMessageBubble(ChatMessage message) {
     final bool isAI = message.senderRole == 'ai';
